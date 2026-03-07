@@ -29,7 +29,7 @@ class ZiWeiRunner:
 
     def _load_settings(self):
         """加载配置"""
-        from .config.settings import settings
+        from ziwei.config.settings import settings
 
         return settings
 
@@ -37,10 +37,10 @@ class ZiWeiRunner:
         """初始化组件"""
         logger.info("🔧 初始化 ZiWei 组件...")
 
-        from .core.adapters import create_adapter
-        from .core.enums import AgentRole
-        from .infra.store import SQLiteStore
-        from .infra.notifier import create_notifier
+        from ziwei.core.adapters import create_adapter
+        from ziwei.core.enums import AgentRole
+        from ziwei.infra.store import SQLiteStore
+        from ziwei.infra.notifier import create_notifier
 
         l0_cfg = self.settings.l0_model
         self.l0_adapter = create_adapter(
