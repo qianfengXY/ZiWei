@@ -1,8 +1,8 @@
 """
 ziwei/core/adapters.py
 各模型适配器实现
-- AnthropicAdapter   → Claude (L0)
-- OpenAIAdapter      → OpenAI-compatible (MiniMax / Qwen / GLM / Deepseek)
+- AnthropicAdapter   → Claude (Opus)
+- OpenAIAdapter     → OpenAI-compatible (MiniMax / GLM / Qwen / Deepseek)
 """
 from __future__ import annotations
 
@@ -14,23 +14,25 @@ from .base_agent import AgentMessage, AgentResponse, BaseAgentAdapter
 from .enums import AgentRole
 
 
-# ─────────────────────────────────────────
-# Anthropic (Claude / Opus 4.6) —— L0 专用
-# ─────────────────────────────────────────
+# Anthropic (Claude / Opus) —— L0 专用
 
 class AnthropicAdapter(BaseAgentAdapter):
     """
-    Claude Opus 4.6 适配器，用于 L0 Brain。
-    使用 Anthropic Messages API。
+    Claude Opus 适配器，用于 L0 Brain。
+    支持自定义 base_url（用于兼容 API 如 cursor.scihub.edu.kg）
     """
 
-    BASE_URL = "https://api.anthropic.com/v1/messages"
-
-    def __init__(self, api_key: str, model: str = "claude-opus-4-6", **kwargs):
+    def __init__(
+        self,
+        api_key: str,
+        model: str = "claude-opus-4-6",
+        base_url: str = "https://api.anthropic.com/v1/messages",
+        **kwargs
+    ):
         super().__init__(
             model_name=model,
             api_key=api_key,
-            base_url=self.BASE_URL,
+            base_url=base_url or "https://api.anthropic.com/v1/messages",
             role=AgentRole.L0_BRAIN,
             **kwargs,
         )
@@ -58,7 +60,7 @@ class AnthropicAdapter(BaseAgentAdapter):
 
         async with httpx.AsyncClient(timeout=self.timeout_s) as client:
             resp = await client.post(
-                self.BASE_URL,
+                self.base_url,
                 headers={
                     "x-api-key": self.api_key,
                     "anthropic-version": "2023-06-01",
@@ -81,15 +83,12 @@ class AnthropicAdapter(BaseAgentAdapter):
         )
 
 
-# ─────────────────────────────────────────
 # OpenAI-Compatible —— L1 / L2 通用
-# 支持：MiniMax / Qwen / GLM / Deepseek / Doubao
-# ─────────────────────────────────────────
 
 class OpenAICompatAdapter(BaseAgentAdapter):
     """
     OpenAI 兼容格式适配器。
-    L1 Manager（MiniMax-2.5 / Doubao）和 L2 Workers（GLM / Qwen / Deepseek）共用。
+    L1 Manager（MiniMax）和 L2 Workers（GLM / Qwen / Deepseek）共用。
     """
 
     def __init__(
@@ -149,22 +148,21 @@ class OpenAICompatAdapter(BaseAgentAdapter):
         )
 
 
-# ─────────────────────────────────────────
-# 工厂函数 —— 按配置创建 Adapter
-# ─────────────────────────────────────────
+# 工厂函数
 
 def create_adapter(cfg: Dict[str, Any], role: AgentRole) -> BaseAgentAdapter:
     """
     根据配置字典创建对应 Adapter。
-
-    cfg 示例:
-      {"provider": "anthropic", "model": "claude-opus-4-6", "api_key": "..."}
-      {"provider": "openai_compat", "model": "MiniMax-Text-01",
-       "base_url": "https://api.minimax.chat/v1", "api_key": "..."}
     """
-    provider = cfg["provider"]
+    provider = cfg.get("provider", "openai_compat")
+    
     if provider == "anthropic":
-        return AnthropicAdapter(api_key=cfg["api_key"], model=cfg["model"])
+        return AnthropicAdapter(
+            api_key=cfg["api_key"],
+            model=cfg.get("model", "claude-opus-4-6"),
+            base_url=cfg.get("base_url", ""),
+        )
+    
     if provider == "openai_compat":
         return OpenAICompatAdapter(
             api_key=cfg["api_key"],
@@ -172,4 +170,5 @@ def create_adapter(cfg: Dict[str, Any], role: AgentRole) -> BaseAgentAdapter:
             base_url=cfg["base_url"],
             role=role,
         )
+    
     raise ValueError(f"未知 provider: {provider}")
